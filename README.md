@@ -12,8 +12,8 @@ use Mix.Config
 config :fluffy_spork, :tentacat_client_opts, %{
   access_token: "YOUR_GITHUB_TOKEN"
 }
-config :fluffy_spork, :github_organization, "YOUR_ORGANIZATION"
-config :fluffy_spork, :columns, [
+
+columns = [
   "Backlog",
   "Ready",
   "In Progress",
@@ -21,4 +21,12 @@ config :fluffy_spork, :columns, [
   "To Deploy",
   "Done"
 ]
+
+projects = [%{
+  org: "YOUR_ORGANIZATION",
+  number: PROJECT_NUMBER,
+  columns: columns
+}]
+
+config :fluffy_spork, :projects, projects
 ```
