@@ -57,7 +57,7 @@ defmodule FluffySpork.Github do
     {:reply, :ok, state}
   end
 
-  def handle_call({:list_issues, owner, repo}) do
+  def handle_call({:list_issues, owner, repo}, _from, state) do
     issues = Tentacat.Issues.list(owner, repo, Map.fetch!(state, :client))
     {:reply, issues, state}
   end

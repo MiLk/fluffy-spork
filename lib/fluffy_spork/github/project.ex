@@ -8,7 +8,7 @@ defmodule FluffySpork.Github.Project do
     GenServer.start_link(__MODULE__, config, name: generate_unique_name(config))
   end
 
-  def generate_unique_name(%{org: org, number: number}) do :"#{org}/#{number}" end
+  def generate_unique_name(%{org: org, number: number}) do :"project:#{org}/#{number}" end
 
   ## Server Callbacks
 
@@ -33,6 +33,10 @@ defmodule FluffySpork.Github.Project do
       |> Enum.each(&FluffySpork.Github.create_column(FluffySpork.Github, project_id, &1))
 
     columns = FluffySpork.Github.list_columns(FluffySpork.Github, project_id)
+    #TODO list cards
+
+    Map.fetch!(config, :repos)
+      |> Enum.each(&FluffySpork.Github.Repository.Supervisor.start_child(&1))
 
     {:noreply, Map.put(state, :columns, columns)}
   end

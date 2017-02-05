@@ -8,7 +8,8 @@ defmodule FluffySpork do
     import Supervisor.Spec, warn: false
 
     children = [
-      worker(FluffySpork.Github, [])
+      worker(FluffySpork.Github, []),
+      supervisor(FluffySpork.Github.Repository.Supervisor, []),
     ]
 
     projects_config = Application.get_env(:fluffy_spork, :projects)
