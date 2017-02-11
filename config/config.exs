@@ -29,6 +29,9 @@ use Mix.Config
 #
 #     import_config "#{Mix.env}.exs"
 
+config :logger, :console, metadata: [:request_id]
+
+# Allow to use the GitHub Projects API
 config :tentacat, :extra_headers, [{"Accept", "application/vnd.github.inertia-preview+json"}]
 
 import_config "private.exs"

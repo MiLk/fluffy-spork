@@ -10,6 +10,7 @@ defmodule FluffySpork do
     children = [
       worker(FluffySpork.Github, []),
       supervisor(FluffySpork.Github.Repository.Supervisor, []),
+      Plug.Adapters.Cowboy.child_spec(:http, FluffySpork.Api, [])
     ]
 
     projects_config = Application.get_env(:fluffy_spork, :projects)

@@ -14,7 +14,7 @@ defmodule FluffySpork.Mixfile do
   #
   # Type "mix help compile.app" for more information
   def application do
-    [applications: [:logger, :tentacat],
+    [applications: [:logger, :tentacat, :cowboy, :plug],
      mod: {FluffySpork, []}]
   end
 
@@ -28,6 +28,11 @@ defmodule FluffySpork.Mixfile do
   #
   # Type "mix help deps" for more examples and options
   defp deps do
-    [{:tentacat, git: "https://github.com/edgurgel/tentacat.git"}]
+    [
+      {:tentacat, git: "https://github.com/edgurgel/tentacat.git"},
+      {:cowboy, "~> 1.1.2"},
+      {:plug, "~> 1.3"},
+      {:poison, "~> 3.0"},
+    ]
   end
 end
