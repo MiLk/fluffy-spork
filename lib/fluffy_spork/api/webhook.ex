@@ -27,8 +27,28 @@ defmodule FluffySpork.Api.Webhook do
   end
 
   defp handle_event(:issues, %{"action" => "opened", "issue" => issue, "repository" => repository}, conn) do
-    IO.inspect({issue, repository})
-    #TODO handle the new issue
+    %{"id" => issue_id, "number" => number, "labels" => labels} = issue
+    %{"id" => repo_id, "owner" => %{"login" => repo_owner}, "name" => repo_name} = repository
+
+    project_config = FluffySpork.Config.get_project_for_repo(%{owner: repo_owner, name: repo_name})
+    %{columns: columns, when_opened: when_opened} = project_config
+
+    %{name: destination} = get_destination_column(labels, columns, when_opened)
+
+    # Move issue into destination column
+    FluffySpork.Github.Project.generate_unique_name(project_config)
+    |> FluffySpork.Github.Project.create_card(destination, issue_id)
+
+    conn
+    |> send_resp(204, "")
+  end
+
+  defp handle_event(:issues, %{"action" => "labeled"}, conn) do
+    conn
+    |> send_resp(204, "")
+  end
+
+  defp handle_event(:label, _, conn) do
     conn
     |> send_resp(204, "")
   end
@@ -39,5 +59,18 @@ defmodule FluffySpork.Api.Webhook do
     |> IO.inspect
     conn
     |> send_resp(500, "Unexpected event")
+  end
+
+  defp get_destination_column([], columns, [issue: issue, pr: _]) do
+    columns |> Enum.at(issue)
+  end
+
+  defp get_destination_column(labels, columns, when_opened) do
+    label_names = labels |> Enum.map(&Map.fetch!(&1, "name"))
+    destination = columns |> Enum.find(fn (column) ->
+      Map.has_key?(column, :label) and Enum.member?(label_names, Map.fetch!(column, :label))
+    end)
+    if destination == nil do get_destination_column([], columns, when_opened)
+    else destination end
   end
 end

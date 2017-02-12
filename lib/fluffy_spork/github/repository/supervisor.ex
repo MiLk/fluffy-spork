@@ -7,15 +7,14 @@ defmodule FluffySpork.Github.Repository.Supervisor do
     Supervisor.start_link(__MODULE__, :ok, name: @name)
   end
 
-  def start_child(name) do
-    import Supervisor.Spec
-
-    child_spec = worker(FluffySpork.Github.Repository, [name])
-    Supervisor.start_child(@name, child_spec)
+  def start_child(name, config) do
+    {:ok, _} = Supervisor.start_child(@name, [name, config])
   end
 
   def init(:ok) do
-      supervise([], strategy: :one_for_one)
+    import Supervisor.Spec
+    children = [worker(FluffySpork.Github.Repository, [])]
+    supervise(children, strategy: :simple_one_for_one)
   end
 
 end

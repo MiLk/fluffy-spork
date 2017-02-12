@@ -14,17 +14,19 @@ config :fluffy_spork, :tentacat_client_opts, %{
 }
 
 columns = [
-  "Backlog",
-  "Ready",
-  "In Progress",
-  "In Review",
-  "To Deploy",
-  "Done"
+  %{name: "Backlog"},
+  %{name: "Ready", label: "ready", color: "ededed"},
+  %{name: "In Progress", label: "in progress", color: "ededed"},
+  %{name: "In Review", label: "ready for review", color: "f9d0c4"},
+  %{name: "To Deploy", label: "to deploy", color: "128a0c"},
+  %{name: "Done"},
 ]
 
 projects = [%{
   org: "YOUR_ORGANIZATION",
   number: PROJECT_NUMBER,
+  when_opened: [issue: 0, pr: 1],
+  when_closed: [issue: 5, pr: 4],
   columns: columns
 }]
 

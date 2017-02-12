@@ -10,6 +10,10 @@ defmodule FluffySpork.Github.Project do
 
   def generate_unique_name(%{org: org, number: number}) do :"project:#{org}/#{number}" end
 
+  def create_card(server, column_name, issue_id) when is_bitstring(column_name) do
+    GenServer.call(server, {:create_card, column_name, issue_id})
+  end
+
   ## Server Callbacks
 
   def init(config) do
@@ -29,6 +33,7 @@ defmodule FluffySpork.Github.Project do
 
     # Create missing columns
     Map.fetch!(config, :columns)
+      |> Enum.map(&Map.fetch!(&1, :name))
       |> Enum.reject(&Enum.member?(created, &1))
       |> Enum.each(&FluffySpork.Github.create_column(FluffySpork.Github, project_id, &1))
 
@@ -36,8 +41,16 @@ defmodule FluffySpork.Github.Project do
     #TODO list cards
 
     Map.fetch!(config, :repos)
-      |> Enum.each(&FluffySpork.Github.Repository.Supervisor.start_child(&1))
+      |> Enum.each(&FluffySpork.Github.Repository.Supervisor.start_child(&1, config))
 
     {:noreply, Map.put(state, :columns, columns)}
+  end
+
+  def handle_call({:create_card, column_name, issue_id}, _from, state) do
+    column_id = Map.fetch!(state, :columns)
+    |> Enum.find(fn (c) -> Map.fetch!(c, "name") == column_name end)
+    |> Map.fetch!("id")
+    FluffySpork.Github.create_card(FluffySpork.Github, column_id, issue_id)
+    {:reply, :ok, state}
   end
 end

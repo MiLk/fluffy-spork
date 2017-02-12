@@ -13,10 +13,10 @@ defmodule FluffySpork do
       Plug.Adapters.Cowboy.child_spec(:http, FluffySpork.Api, [])
     ]
 
-    projects_config = Application.get_env(:fluffy_spork, :projects)
-    projects_children = Enum.map(projects_config, fn(config) ->
-      worker(FluffySpork.Github.Project, [config])
-    end)
+    projects_children = Application.get_env(:fluffy_spork, :projects)
+      |> Enum.map(fn(config) ->
+        worker(FluffySpork.Github.Project, [config])
+      end)
 
     # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html
     # for other strategies and supported options
