@@ -15,12 +15,16 @@ defmodule FluffySpork.Github.Project do
     GenServer.call(server, {:create_card, column_name, issue_id, type})
   end
 
-  def has_card(server, {repo_owner, repo_name, number}) when is_bitstring(repo_owner) and is_bitstring(repo_name) and is_number(number) do
-    has_card(server, {String.to_atom(repo_owner), String.to_atom(repo_name), number})
+  def move_card(server, id, column_id, position) do
+    GenServer.call(server, {:move_card, id, column_id, position})
   end
 
-  def has_card(server, {repo_owner, repo_name, number}) when is_atom(repo_owner) and is_atom(repo_name) and is_number(number) do
-    GenServer.call(server, {:has_card, {repo_owner, repo_name, number}})
+  def has_card(server, issue) do
+    GenServer.call(server, {:has_card, issue})
+  end
+
+  def get_card_id(server, issue) do
+    GenServer.call(server, {:get_card_id, issue})
   end
 
   ## Server Callbacks
@@ -49,9 +53,24 @@ defmodule FluffySpork.Github.Project do
     {:reply, :ok, state}
   end
 
-  def handle_call({:has_card, issue}, _from, state) do
-    issues = state |> Map.fetch!(:cards) |> list_issues
+   def handle_call({:move_card, id, column_name, position}, _from, state) do
+    column_id = Map.fetch!(state, :columns)
+    |> Enum.find(fn (c) -> Map.fetch!(c, "name") == column_name end)
+    |> Map.fetch!("id")
+    FluffySpork.Github.move_card(FluffySpork.Github, id, column_id, position)
+    {:reply, :ok, state}
+  end
+
+  def handle_call({:has_card, {owner, name, number}}, _from, state) do
+    issues = state |> Map.fetch!(:cards) |> list_issues |> Map.keys
+    issue = {String.to_atom(owner), String.to_atom(name), number}
     {:reply, Enum.member?(issues, issue), state}
+  end
+
+  def handle_call({:get_card_id, {owner, name, number}}, _from, state) do
+    issues = state |> Map.fetch!(:cards) |> list_issues
+    issue = {String.to_atom(owner), String.to_atom(name), number}
+    {:reply, Map.get(issues, issue), state}
   end
 
   ## Helpers
@@ -86,9 +105,9 @@ defmodule FluffySpork.Github.Project do
   defp list_issues(cards) do
     cards
     |> List.flatten
-    |> Enum.map(fn (%{"content_url" => content_url}) ->
+    |> Enum.reduce(%{}, fn (%{"id" => id, "content_url" => content_url}, acc) ->
       [owner, name, _, number] = content_url |> String.slice(29..-1) |> String.split("/")
-      {String.to_atom(owner), String.to_atom(name), String.to_integer(number)}
+      Map.put(acc, {String.to_atom(owner), String.to_atom(name), String.to_integer(number)}, id)
     end)
   end
 end
