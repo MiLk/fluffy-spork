@@ -8,6 +8,7 @@ defmodule FluffySpork.Github.Project do
     GenServer.start_link(__MODULE__, config, name: generate_unique_name(config))
   end
 
+  def generate_unique_name(%{owner: owner, repo: repo, number: number}) do :"project:#{owner}/#{repo}/#{number}" end
   def generate_unique_name(%{org: org, number: number}) do :"project:#{org}/#{number}" end
 
   def create_card(server, column_name, issue_id) when is_bitstring(column_name) do
@@ -25,25 +26,7 @@ defmodule FluffySpork.Github.Project do
     %{config: config} = state
 
     project_id = FluffySpork.Github.get_project_id(FluffySpork.Github, config)
-    Logger.info("Initializing project #{project_id}.")
-
-    # Fetch the names of existing columns
-    created = FluffySpork.Github.list_columns(FluffySpork.Github, project_id)
-      |> Enum.map(&Map.fetch!(&1, "name"))
-
-    # Create missing columns
-    Map.fetch!(config, :columns)
-      |> Enum.map(&Map.fetch!(&1, :name))
-      |> Enum.reject(&Enum.member?(created, &1))
-      |> Enum.each(&FluffySpork.Github.create_column(FluffySpork.Github, project_id, &1))
-
-    columns = FluffySpork.Github.list_columns(FluffySpork.Github, project_id)
-    #TODO list cards
-
-    Map.fetch!(config, :repos)
-      |> Enum.each(&FluffySpork.Github.Repository.Supervisor.start_child(&1, config))
-
-    {:noreply, Map.put(state, :columns, columns)}
+    init_project(project_id, config, state)
   end
 
   def handle_call({:create_card, column_name, issue_id}, _from, state) do
@@ -52,5 +35,34 @@ defmodule FluffySpork.Github.Project do
     |> Map.fetch!("id")
     FluffySpork.Github.create_card(FluffySpork.Github, column_id, issue_id)
     {:reply, :ok, state}
+  end
+
+  ## Helpers
+
+  defp init_project(nil, config, state) do
+    Logger.error("No project matching given configuration: #{inspect(config)}")
+    {:stop, :shutdown, state}
+  end
+
+  defp init_project(project_id, config, state) do
+    Logger.info("Initializing project #{project_id}.")
+
+    # Fetch the names of existing columns
+    created = FluffySpork.Github.list_columns(FluffySpork.Github, project_id)
+    |> Enum.map(&Map.fetch!(&1, "name"))
+
+    # Create missing columns
+    Map.fetch!(config, :columns)
+    |> Enum.map(&Map.fetch!(&1, :name))
+    |> Enum.reject(&Enum.member?(created, &1))
+    |> Enum.each(&FluffySpork.Github.create_column(FluffySpork.Github, project_id, &1))
+
+    columns = FluffySpork.Github.list_columns(FluffySpork.Github, project_id)
+    #TODO list cards
+
+    Map.fetch!(config, :repos)
+    |> Enum.each(&FluffySpork.Github.Repository.Supervisor.start_child(&1, config))
+
+    {:noreply, Map.put(state, :columns, columns)}
   end
 end

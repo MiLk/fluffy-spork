@@ -13,18 +13,12 @@ defmodule FluffySpork.Api.Webhook do
     |> handle_event(conn.body_params, conn)
   end
 
-  match _ do
-    conn
-    |> send_resp(404, "")
-  end
+  match _ do conn |> send_resp(404, "") end
 
   defp extract_github_event({k, v}) when k == "x-github-event" do v end
   defp extract_github_event(_) do nil end
 
-  defp handle_event(:ping, _, conn) do
-    conn
-    |> send_resp(200, "pong")
-  end
+  defp handle_event(:ping, _, conn) do conn |> send_resp(200, "pong") end
 
   defp handle_event(:issues, %{"action" => "opened", "issue" => issue, "repository" => repository}, conn) do
     %{"id" => issue_id, "number" => number, "labels" => labels} = issue
@@ -39,26 +33,15 @@ defmodule FluffySpork.Api.Webhook do
     FluffySpork.Github.Project.generate_unique_name(project_config)
     |> FluffySpork.Github.Project.create_card(destination, issue_id)
 
-    conn
-    |> send_resp(204, "")
+    conn |> send_resp(204, "")
   end
 
-  defp handle_event(:issues, %{"action" => "labeled"}, conn) do
-    conn
-    |> send_resp(204, "")
-  end
-
-  defp handle_event(:label, _, conn) do
-    conn
-    |> send_resp(204, "")
-  end
+  defp handle_event(:issues, %{"action" => "labeled"}, conn) do conn |> send_resp(204, "") end
 
   defp handle_event(event, body_params, conn) do
     Logger.error("Unexpected event in #{__MODULE__}: #{event}")
-    body_params
-    |> IO.inspect
-    conn
-    |> send_resp(500, "Unexpected event")
+    body_params |> IO.inspect
+    conn |> send_resp(500, "Unexpected event")
   end
 
   defp get_destination_column([], columns, [issue: issue, pr: _]) do

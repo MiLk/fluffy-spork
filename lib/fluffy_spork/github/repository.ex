@@ -25,7 +25,7 @@ defmodule FluffySpork.Github.Repository do
     |> Enum.map(&Map.fetch!(&1, "name"))
 
     # Add missing labels
-    missing_labels = Map.fetch!(config, :columns) |> Enum.reject(fn (column) ->
+    Map.fetch!(config, :columns) |> Enum.reject(fn (column) ->
       !Map.has_key?(column, :label) or Enum.member?(labels, Map.fetch!(column, :label))
     end)
     |> Enum.each(fn (column) ->

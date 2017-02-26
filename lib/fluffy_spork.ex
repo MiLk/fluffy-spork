@@ -15,7 +15,10 @@ defmodule FluffySpork do
 
     projects_children = Application.get_env(:fluffy_spork, :projects)
       |> Enum.map(fn(config) ->
-        worker(FluffySpork.Github.Project, [config])
+        worker(FluffySpork.Github.Project, [config],
+          id: FluffySpork.Github.Project.generate_unique_name(config),
+          restart: :transient
+        )
       end)
 
     # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html

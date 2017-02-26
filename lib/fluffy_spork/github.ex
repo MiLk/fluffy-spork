@@ -8,8 +8,8 @@ defmodule FluffySpork.Github do
     GenServer.start_link(__MODULE__, :ok, name: FluffySpork.Github)
   end
 
-  def get_project_id(server, %{org: org, number: number}) do
-    GenServer.call(server, {:get_project_id, %{org: org, number: number}})
+  def get_project_id(server, config) do
+    GenServer.call(server, {:get_project_id, config})
   end
 
   def list_columns(server, project_id) do
@@ -61,14 +61,14 @@ defmodule FluffySpork.Github do
     {:ok, %{client: client}}
   end
 
+  def handle_call({:get_project_id, %{owner: owner, repo: repo, number: number}}, _from, state) do
+    Tentacat.Projects.list_repos(owner, repo, Map.fetch!(state, :client))
+    |> handle_get_project_id(number, state)
+  end
+
   def handle_call({:get_project_id, %{org: org, number: number}}, _from, state) do
-    url = "https://api.github.com/orgs/#{org}"
     project = Tentacat.Projects.list_orgs(org, Map.fetch!(state, :client))
-      |> Enum.find(fn
-          %{"owner_url" => ^url, "number" => ^number} -> true
-          _ -> false
-        end)
-    {:reply, Map.fetch!(project, "id"), state}
+    |> handle_get_project_id(number, state)
   end
 
   def handle_call({:list_columns, project_id}, _from, state) do
@@ -100,5 +100,20 @@ defmodule FluffySpork.Github do
   def handle_call({:create_card, column_id, body}, _from, state) do
     {201, _} = Tentacat.Projects.Cards.create(column_id, body, Map.fetch!(state, :client))
     {:reply, :ok, state}
+  end
+
+  ## Helpers
+
+  defp handle_get_project_id(projects, number, state) do
+    project_id = projects
+    |> Enum.find(fn
+      %{"number" => ^number} -> true
+      _ -> false
+    end)
+    |> case do
+      %{"id" => id} -> id
+      _ -> nil
+    end
+    {:reply, project_id, state}
   end
 end

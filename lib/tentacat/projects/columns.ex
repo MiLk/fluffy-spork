@@ -8,7 +8,7 @@ defmodule Tentacat.Projects.Columns do
   end
 
   @spec create(binary, binary, Client.t) :: Tentacat.response
-  def create(project_id, name, client \\ %Client{}, body \\ "") do
+  def create(project_id, name, client \\ %Client{}) do
     post "projects/#{project_id}/columns", client, %{name: name}
   end
 end
