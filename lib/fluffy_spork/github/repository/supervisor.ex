@@ -8,7 +8,18 @@ defmodule FluffySpork.Github.Repository.Supervisor do
   end
 
   def start_child(name, config) do
-    {:ok, _} = Supervisor.start_child(@name, [name, config])
+    # List already managed repositories
+    children = Supervisor.which_children(@name)
+    |> Enum.map(&elem(&1, 1))
+    |> Enum.map(&Process.info(&1))
+    |> Enum.map(&Keyword.get(&1, :registered_name))
+    # Generate the name of the child for the new repository
+    to_start = FluffySpork.Github.Repository.generate_unique_name(name)
+    # Do nothing if already started
+    if not Enum.member?(children, to_start) do
+      {:ok, _} = Supervisor.start_child(@name, [name, config])
+    end
+    {:ok}
   end
 
   def init(:ok) do

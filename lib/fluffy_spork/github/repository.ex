@@ -33,9 +33,18 @@ defmodule FluffySpork.Github.Repository do
       FluffySpork.Github.create_label(FluffySpork.Github, name, column[:label], column[:color])
     end)
 
+    # List issues
     issues = FluffySpork.Github.list_issues(FluffySpork.Github, name)
 
-    #TODO move issues in the right column in the project
+    [repo_owner, repo_name] = String.split(name, "/", parts: 2)
+    # Send a fake webhook event for each issue to create the missing cards
+    issues |> Enum.map(fn (issue) -> %{
+          "action" => "opened",
+          "issue" => issue,
+          "repository" => %{"owner" => %{"login" => repo_owner}, "name" => repo_name}
+        }
+      end)
+    |> Enum.each(&FluffySpork.Api.Webhook.send_fake_event(:issues, &1))
 
     {:noreply, Map.put(state, :issues, issues)}
   end

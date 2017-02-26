@@ -47,11 +47,15 @@ defmodule FluffySpork.Github do
     create_label(server, owner, repo, name, color)
   end
 
-  def create_card(server, column_id, issue_id) do
+  def create_card(server, column_id, issue_id, type) do
     GenServer.call(server, {:create_card, column_id, %{
      "content_id": issue_id,
-     "content_type": "Issue"
+     "content_type": type
     }})
+  end
+
+  def list_cards(server, %{"id" => column_id}) do
+    GenServer.call(server, {:list_cards, column_id})
   end
 
   ## Server Callbacks
@@ -100,6 +104,11 @@ defmodule FluffySpork.Github do
   def handle_call({:create_card, column_id, body}, _from, state) do
     {201, _} = Tentacat.Projects.Cards.create(column_id, body, Map.fetch!(state, :client))
     {:reply, :ok, state}
+  end
+
+  def handle_call({:list_cards, column_id}, _from, state) do
+    cards = Tentacat.Projects.Cards.list(column_id, Map.fetch!(state, :client))
+    {:reply, cards, state}
   end
 
   ## Helpers
