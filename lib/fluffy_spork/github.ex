@@ -47,7 +47,7 @@ defmodule FluffySpork.Github do
     create_label(server, owner, repo, name, color)
   end
 
-  def list_cards(server, %{"id" => column_id}) do
+  def list_cards(server, column_id) do
     GenServer.call(server, {:list_cards, column_id})
   end
 

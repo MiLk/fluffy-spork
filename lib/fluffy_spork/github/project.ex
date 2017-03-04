@@ -11,6 +11,10 @@ defmodule FluffySpork.Github.Project do
   def generate_unique_name(%{owner: owner, repo: repo, number: number}) do :"project:#{owner}/#{repo}/#{number}" end
   def generate_unique_name(%{org: org, number: number}) do :"project:#{org}/#{number}" end
 
+  def refresh(server, column_id) do
+    GenServer.cast(server, {:refresh, column_id})
+  end
+
   def create_card(server, column_name, issue_id, type) when is_bitstring(column_name) do
     GenServer.call(server, {:create_card, column_name, issue_id, type})
   end
@@ -39,6 +43,10 @@ defmodule FluffySpork.Github.Project do
 
     project_id = FluffySpork.Github.get_project_id(FluffySpork.Github, config)
     init_project(project_id, config, state)
+  end
+
+  def handle_cast({:refresh, column_id}, state) do
+    {:noreply, put_in(state, [:cards, column_id], do_column_refresh(column_id))}
   end
 
   def handle_call({:create_card, column_name, issue_id, type}, _from, state) do
@@ -93,21 +101,39 @@ defmodule FluffySpork.Github.Project do
     |> Enum.reject(&Enum.member?(created, &1))
     |> Enum.each(&FluffySpork.Github.create_column(FluffySpork.Github, project_id, &1))
 
-    columns = FluffySpork.Github.list_columns(FluffySpork.Github, project_id)
-    cards = columns |> Enum.map(&FluffySpork.Github.list_cards(FluffySpork.Github, &1))
+    # Update the state
+    state = state |> Map.put_new(:id, project_id) |> Map.merge(do_project_refresh(project_id))
 
+    # Start one GenServer for each repository
     Map.fetch!(config, :repos)
     |> Enum.each(&FluffySpork.Github.Repository.Supervisor.start_child(&1, config))
 
-    {:noreply, Map.merge(state, %{columns: columns, cards: cards})}
+    Logger.info("Project #{project_id} initialized.")
+
+    {:noreply, state}
   end
 
   defp list_issues(cards) do
     cards
+    |> Map.values
     |> List.flatten
     |> Enum.reduce(%{}, fn (%{"id" => id, "content_url" => content_url}, acc) ->
       [owner, name, _, number] = content_url |> String.slice(29..-1) |> String.split("/")
       Map.put(acc, {String.to_atom(owner), String.to_atom(name), String.to_integer(number)}, id)
     end)
+  end
+
+  defp do_project_refresh(project_id) do
+    columns = FluffySpork.Github.list_columns(FluffySpork.Github, project_id)
+    column_ids = columns |> Enum.map(&Map.fetch!(&1, "id"))
+    cards = Enum.zip(
+      column_ids,
+      column_ids |> Enum.map(&FluffySpork.Github.list_cards(FluffySpork.Github, &1))
+    ) |> Enum.into(%{})
+    %{columns: columns, cards: cards}
+  end
+
+  defp do_column_refresh(column_id) do
+    FluffySpork.Github.list_cards(FluffySpork.Github, column_id)
   end
 end

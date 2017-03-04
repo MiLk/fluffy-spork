@@ -37,7 +37,16 @@ defmodule FluffySpork.Api.Webhook do
   end
   defp handle_event(:pull_request, %{"action" => "labeled"}) do {204, ""} end
 
-  defp handle_event(:project_card, %{"action" => "created"}) do {204, ""} end
+  defp handle_event(:project_card, %{
+    "action" => "created",
+    "project_card" => %{"column_id" => column_id},
+    "repository" => %{"owner" => %{"login" => repo_owner}, "name" => repo_name}
+  }) do
+    FluffySpork.Config.get_project_for_repo(%{owner: repo_owner, name: repo_name})
+    |> FluffySpork.Github.Project.generate_unique_name
+    |> FluffySpork.Github.Project.refresh(column_id)
+    {204, ""}
+  end
   defp handle_event(:project_card, %{"action" => "moved"}) do {204, ""} end
 
   defp handle_event(event, body_params) do

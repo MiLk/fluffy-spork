@@ -46,6 +46,8 @@ defmodule FluffySpork.Github.Repository do
       end)
     |> Enum.each(&FluffySpork.Api.Webhook.send_fake_event(:issues, &1))
 
+    Logger.info("Repository #{name} initialized.")
+
     {:noreply, Map.put(state, :issues, issues)}
   end
 end
