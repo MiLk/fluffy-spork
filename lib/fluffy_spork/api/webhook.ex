@@ -26,13 +26,13 @@ defmodule FluffySpork.Api.Webhook do
   defp handle_event(:ping, _) do {200, "pong"} end
 
   defp handle_event(:issues, %{"action" => action, "issue" => issue, "repository" => repository})
-    when action == "opened" or action == "closed" do
+    when action == "opened" or action == "closed" or action == "reopened" do
       handle_action(String.to_atom(action), :issue, repository, issue)
   end
   defp handle_event(:issues, %{"action" => "labeled"}) do {204, ""} end
 
   defp handle_event(:pull_request, %{"action" => action, "pull_request" => pull_request, "repository" => repository})
-    when action == "opened" or action == "closed" do
+    when action == "opened" or action == "closed" or action == "reopened" do
       handle_action(String.to_atom(action), :pr, repository, pull_request)
   end
   defp handle_event(:pull_request, %{"action" => "labeled"}) do {204, ""} end
@@ -57,13 +57,25 @@ defmodule FluffySpork.Api.Webhook do
 
   ## Helpers
 
-  defp get_destination_column([], columns, destination), do: columns |> Enum.at(destination)
-  defp get_destination_column(labels, columns, default_destination) do
+  defp get_destination_column([], {columns, destination}), do: columns |> Enum.at(destination)
+  defp get_destination_column(labels, {columns, default_destination}) do
     label_names = labels |> Enum.map(&Map.fetch!(&1, "name"))
     destination = columns |> Enum.find(fn (column) ->
       Map.has_key?(column, :label) and Enum.member?(label_names, Map.fetch!(column, :label))
     end)
-    destination || get_destination_column([], columns, default_destination)
+    destination || get_destination_column([], {columns, default_destination})
+  end
+
+  defp get_destination_config(project_config, action, type, pr \\ nil)
+  defp get_destination_config(project_config, :reopened, type, _) do
+    get_destination_config(project_config, :opened, type)
+  end
+  defp get_destination_config(project_config, :closed, :pr, %{"merged" => true}) do
+    get_destination_config(project_config, :merged, :pr)
+  end
+  defp get_destination_config(project_config, action, type, _) do
+    %{columns: columns, destinations: %{^action => %{^type => default_destination}}} = project_config
+    {columns, default_destination}
   end
 
   defp handle_action(action, type, repository, issue) do
@@ -71,8 +83,10 @@ defmodule FluffySpork.Api.Webhook do
     %{"id" => issue_id, "number" => number} = issue
 
     project_config = FluffySpork.Config.get_project_for_repo(%{owner: repo_owner, name: repo_name})
-    %{columns: columns, destinations: %{^action => %{^type => default_destination}}} = project_config
-    %{name: destination} = get_destination_column(Map.get(issue, "labels", []), columns, default_destination)
+    %{name: destination} = get_destination_column(
+      Map.get(issue, "labels", []),
+      get_destination_config(project_config, action, type, issue)
+    )
 
     do_handle_action(action, FluffySpork.Github.Project.generate_unique_name(project_config),
       {repo_owner, repo_name, number}, destination,
@@ -86,7 +100,8 @@ defmodule FluffySpork.Api.Webhook do
     {204, ""}
   end
 
-  defp do_handle_action(:closed, project_server, card, destination, _) do
+  defp do_handle_action(action, project_server, card, destination, _)
+  when action == :reopened or action == :closed do
     card_id = FluffySpork.Github.Project.get_card_id(project_server, card)
     if card_id == nil do
       {repo_owner, repo_name, number} = card
