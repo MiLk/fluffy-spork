@@ -25,24 +25,17 @@ defmodule FluffySpork.Api.Webhook do
 
   defp handle_event(:ping, _) do {200, "pong"} end
 
-  defp handle_event(:issues, %{"action" => "opened", "issue" => issue, "repository" => repository}) do
-    %{"labels" => labels} = issue
-    create_card(:issue, repository, issue, labels)
+  defp handle_event(:issues, %{"action" => action, "issue" => issue, "repository" => repository})
+    when action == "opened" or action == "closed" do
+      handle_action(String.to_atom(action), :issue, repository, issue)
   end
-
   defp handle_event(:issues, %{"action" => "labeled"}) do {204, ""} end
-  defp handle_event(:issues, %{"action" => "closed", "issue" => issue, "repository" => repository}) do
-    handle_close(:issue, repository, issue)
-  end
 
-  defp handle_event(:pull_request, %{"action" => "opened", "pull_request" => pull_request, "repository" => repository}) do
-    labels = []
-    create_card(:pr, repository, pull_request, labels)
+  defp handle_event(:pull_request, %{"action" => action, "pull_request" => pull_request, "repository" => repository})
+    when action == "opened" or action == "closed" do
+      handle_action(String.to_atom(action), :pr, repository, pull_request)
   end
   defp handle_event(:pull_request, %{"action" => "labeled"}) do {204, ""} end
-  defp handle_event(:pull_request, %{"action" => "closed", "pull_request" => pull_request, "repository" => repository}) do
-    handle_close(:pr, repository, pull_request)
-  end
 
   defp handle_event(:project_card, %{"action" => "created"}) do {204, ""} end
   defp handle_event(:project_card, %{"action" => "moved"}) do {204, ""} end
@@ -55,49 +48,39 @@ defmodule FluffySpork.Api.Webhook do
 
   ## Helpers
 
-  defp get_destination_column([], columns, [issue: issue, pr: _], :issue) do columns |> Enum.at(issue) end
-  defp get_destination_column([], columns, [issue: _, pr: pr], :pr) do columns |> Enum.at(pr) end
-
-  defp get_destination_column(labels, columns, when_opened, type) do
+  defp get_destination_column([], columns, destination), do: columns |> Enum.at(destination)
+  defp get_destination_column(labels, columns, default_destination) do
     label_names = labels |> Enum.map(&Map.fetch!(&1, "name"))
     destination = columns |> Enum.find(fn (column) ->
       Map.has_key?(column, :label) and Enum.member?(label_names, Map.fetch!(column, :label))
     end)
-    if destination == nil do get_destination_column([], columns, when_opened, type)
-    else destination end
+    destination || get_destination_column([], columns, default_destination)
   end
 
-  defp create_card(type, repository, issue, labels) do
+  defp handle_action(action, type, repository, issue) do
     %{"owner" => %{"login" => repo_owner}, "name" => repo_name} = repository
     %{"id" => issue_id, "number" => number} = issue
 
     project_config = FluffySpork.Config.get_project_for_repo(%{owner: repo_owner, name: repo_name})
-    %{columns: columns, when_opened: when_opened} = project_config
+    %{columns: columns, destinations: %{^action => %{^type => default_destination}}} = project_config
+    %{name: destination} = get_destination_column(Map.get(issue, "labels", []), columns, default_destination)
 
-    %{name: destination} = get_destination_column(labels, columns, when_opened, type)
+    do_handle_action(action, FluffySpork.Github.Project.generate_unique_name(project_config),
+      {repo_owner, repo_name, number}, destination,
+      {issue_id, type})
+  end
 
-    # Move issue into destination column
-    project_server = FluffySpork.Github.Project.generate_unique_name(project_config)
-    unless FluffySpork.Github.Project.has_card(project_server, {repo_owner, repo_name, number}) do
+  defp do_handle_action(:opened, project_server, card, destination, {issue_id, type}) do
+    unless FluffySpork.Github.Project.has_card(project_server, card) do
       FluffySpork.Github.Project.create_card(project_server, destination, issue_id, type)
     end
-
     {204, ""}
   end
 
-  defp handle_close(type, repository, issue) do
-    %{"owner" => %{"login" => repo_owner}, "name" => repo_name} = repository
-    %{"id" => _issue_id, "number" => number} = issue
-
-    project_config = FluffySpork.Config.get_project_for_repo(%{owner: repo_owner, name: repo_name})
-    %{columns: columns, when_closed: when_closed} = project_config
-
-    %{name: destination} = get_destination_column([], columns, when_closed, type)
-
-    # Move issue into destination column
-    project_server = FluffySpork.Github.Project.generate_unique_name(project_config)
-    card_id = FluffySpork.Github.Project.get_card_id(project_server, {repo_owner, repo_name, number})
+  defp do_handle_action(:closed, project_server, card, destination, _) do
+    card_id = FluffySpork.Github.Project.get_card_id(project_server, card)
     if card_id == nil do
+      {repo_owner, repo_name, number} = card
       Logger.error("Unable to find the card_id for the issue: #{repo_owner}/#{repo_name}/#{number}")
       {500, "Unable to find the card_id for the issue: #{repo_owner}/#{repo_name}/#{number}"}
     else

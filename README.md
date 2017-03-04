@@ -25,8 +25,11 @@ columns = [
 projects = [%{
   org: "YOUR_ORGANIZATION",
   number: PROJECT_NUMBER,
-  when_opened: [issue: 0, pr: 1],
-  when_closed: [issue: 5, pr: 4],
+  destinations: %{
+    opened: %{issue: 0, pr: 2},
+    closed: %{issue: 5, pr: 5},
+    merged: %{pr: 4},
+  },
   columns: columns
 }]
 

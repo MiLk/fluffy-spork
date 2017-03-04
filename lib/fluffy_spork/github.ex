@@ -60,7 +60,7 @@ defmodule FluffySpork.Github do
 
   def move_card(server, id, column_id, position) do
     GenServer.call(server, {:move_card, id, %{
-      "position" => "top",
+      "position" => position,
       "column_id" => column_id
     }})
   end
@@ -78,7 +78,7 @@ defmodule FluffySpork.Github do
   end
 
   def handle_call({:get_project_id, %{org: org, number: number}}, _from, state) do
-    project = Tentacat.Projects.list_orgs(org, Map.fetch!(state, :client))
+    Tentacat.Projects.list_orgs(org, Map.fetch!(state, :client))
     |> handle_get_project_id(number, state)
   end
 
