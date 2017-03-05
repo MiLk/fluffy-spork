@@ -1,4 +1,8 @@
 defmodule FluffySpork.Api do
+  @moduledoc """
+  Main entrypoint for the Web API
+  """
+
   use Plug.Router
 
   plug Plug.Logger

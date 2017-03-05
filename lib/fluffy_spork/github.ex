@@ -1,4 +1,8 @@
 defmodule FluffySpork.Github do
+  @moduledoc """
+  Handle interactions with GitHub
+  """
+
   use GenServer
   require Logger
 
@@ -73,12 +77,14 @@ defmodule FluffySpork.Github do
   end
 
   def handle_call({:get_project_id, %{owner: owner, repo: repo, number: number}}, _from, state) do
-    Tentacat.Projects.list_repos(owner, repo, Map.fetch!(state, :client))
+    owner
+    |> Tentacat.Projects.list_repos(repo, Map.fetch!(state, :client))
     |> handle_get_project_id(number, state)
   end
 
   def handle_call({:get_project_id, %{org: org, number: number}}, _from, state) do
-    Tentacat.Projects.list_orgs(org, Map.fetch!(state, :client))
+    org
+    |> Tentacat.Projects.list_orgs(Map.fetch!(state, :client))
     |> handle_get_project_id(number, state)
   end
 

@@ -1,4 +1,8 @@
 defmodule FluffySpork.Api.Webhook do
+  @moduledoc """
+  Handle Webhook requests sent by GitHub
+  """
+
   use Plug.Router
   require Logger
 
@@ -48,16 +52,16 @@ defmodule FluffySpork.Api.Webhook do
     "project_card" => %{"column_id" => column_id},
     "repository" => %{"owner" => %{"login" => repo_owner}, "name" => repo_name}
   }) do
-    FluffySpork.Config.get_project_for_repo(%{owner: repo_owner, name: repo_name})
+    %{owner: repo_owner, name: repo_name}
+    |> FluffySpork.Config.get_project_for_repo
     |> FluffySpork.Github.Project.generate_unique_name
     |> FluffySpork.Github.Project.refresh(column_id)
     {204, ""}
   end
   defp handle_event(:project_card, %{"action" => "moved"}) do {204, ""} end
 
-  defp handle_event(event, body_params) do
+  defp handle_event(event, _) do
     Logger.error("Unexpected event in #{__MODULE__}: #{event}")
-    body_params |> IO.inspect
     {500, "Unexpected event"}
   end
 
@@ -86,7 +90,9 @@ defmodule FluffySpork.Api.Webhook do
     get_destination_config(project_config, :merged, :pr)
   end
   defp get_destination_config(project_config, action, type, _) do
-    %{columns: columns, destinations: %{^action => %{^type => default_destination}}} = project_config
+    %{columns: columns, destinations: %{
+      ^action => %{^type => default_destination}
+    }} = project_config
     {columns, default_destination}
   end
 
@@ -98,7 +104,8 @@ defmodule FluffySpork.Api.Webhook do
     %{columns: columns} = project_config
     case get_destination_column([label], {columns, nil}) do
       nil -> {204, ""}
-      %{name: destination} -> do_handle_action(:labeled, FluffySpork.Github.Project.generate_unique_name(project_config),
+      %{name: destination} -> do_handle_action(:labeled,
+        FluffySpork.Github.Project.generate_unique_name(project_config),
         {repo_owner, repo_name, number}, destination, nil)
     end
   end
@@ -113,7 +120,8 @@ defmodule FluffySpork.Api.Webhook do
       get_destination_config(project_config, action, type, issue)
     ) do
       nil -> {204, ""}
-      %{name: destination} -> do_handle_action(action, FluffySpork.Github.Project.generate_unique_name(project_config),
+      %{name: destination} -> do_handle_action(action,
+        FluffySpork.Github.Project.generate_unique_name(project_config),
         {repo_owner, repo_name, number}, destination,
         {issue_id, type})
     end

@@ -1,6 +1,9 @@
 defmodule Tentacat.Projects.Cards do
   import Tentacat
   alias Tentacat.Client
+  @moduledoc """
+  The Project cards API allows to manage project cards.
+  """
 
   @spec list(binary, Client.t) :: Tentacat.response
   def list(column_id, client \\ %Client{}) do

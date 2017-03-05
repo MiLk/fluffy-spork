@@ -1,4 +1,8 @@
 defmodule FluffySpork.Github.Repository.Supervisor do
+  @moduledoc """
+  Supervisor for the Respository GenServer
+  """
+
   use Supervisor
 
   @name FluffySpork.Github.Repository.Supervisor
@@ -9,7 +13,8 @@ defmodule FluffySpork.Github.Repository.Supervisor do
 
   def start_child(name, config) do
     # List already managed repositories
-    children = Supervisor.which_children(@name)
+    children = @name
+    |> Supervisor.which_children
     |> Enum.map(&elem(&1, 1))
     |> Enum.map(&Process.info(&1))
     |> Enum.map(&Keyword.get(&1, :registered_name))

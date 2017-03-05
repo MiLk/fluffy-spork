@@ -1,6 +1,9 @@
 defmodule Tentacat.Projects.Columns do
   import Tentacat
   alias Tentacat.Client
+  @moduledoc """
+  The Project columns API allows to manage project columns.
+  """
 
   @spec list(binary, Client.t) :: Tentacat.response
   def list(project_id, client \\ %Client{}, params \\ [], options \\ []) do

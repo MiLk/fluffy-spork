@@ -1,4 +1,8 @@
 defmodule FluffySpork.Github.Project do
+  @moduledoc """
+  GenServer handling operations against one GitHub project
+  """
+
   use GenServer
   require Logger
 
@@ -50,7 +54,8 @@ defmodule FluffySpork.Github.Project do
   end
 
   def handle_call({:create_card, column_name, issue_id, type}, _from, state) do
-    column_id = Map.fetch!(state, :columns)
+    column_id = state
+    |> Map.fetch!(:columns)
     |> Enum.find(fn (c) -> Map.fetch!(c, "name") == column_name end)
     |> Map.fetch!("id")
     # https://platform.github.community/t/a-few-issues-ive-had-with-the-projects-preview-api/531/6
@@ -62,7 +67,8 @@ defmodule FluffySpork.Github.Project do
   end
 
    def handle_call({:move_card, id, column_name, position}, _from, state) do
-    column_id = Map.fetch!(state, :columns)
+    column_id = state
+    |> Map.fetch!(:columns)
     |> Enum.find(fn (c) -> Map.fetch!(c, "name") == column_name end)
     |> Map.fetch!("id")
     FluffySpork.Github.move_card(FluffySpork.Github, id, column_id, position)
@@ -92,11 +98,13 @@ defmodule FluffySpork.Github.Project do
     Logger.info("Initializing project #{project_id}.")
 
     # Fetch the names of existing columns
-    created = FluffySpork.Github.list_columns(FluffySpork.Github, project_id)
+    created = FluffySpork.Github
+    |> FluffySpork.Github.list_columns(project_id)
     |> Enum.map(&Map.fetch!(&1, "name"))
 
     # Create missing columns
-    Map.fetch!(config, :columns)
+    config
+    |> Map.fetch!(:columns)
     |> Enum.map(&Map.fetch!(&1, :name))
     |> Enum.reject(&Enum.member?(created, &1))
     |> Enum.each(&FluffySpork.Github.create_column(FluffySpork.Github, project_id, &1))
@@ -105,7 +113,8 @@ defmodule FluffySpork.Github.Project do
     state = state |> Map.put_new(:id, project_id) |> Map.merge(do_project_refresh(project_id))
 
     # Start one GenServer for each repository
-    Map.fetch!(config, :repos)
+    config
+    |> Map.fetch!(:repos)
     |> Enum.each(&FluffySpork.Github.Repository.Supervisor.start_child(&1, config))
 
     Logger.info("Project #{project_id} initialized.")
@@ -126,10 +135,9 @@ defmodule FluffySpork.Github.Project do
   defp do_project_refresh(project_id) do
     columns = FluffySpork.Github.list_columns(FluffySpork.Github, project_id)
     column_ids = columns |> Enum.map(&Map.fetch!(&1, "id"))
-    cards = Enum.zip(
-      column_ids,
-      column_ids |> Enum.map(&FluffySpork.Github.list_cards(FluffySpork.Github, &1))
-    ) |> Enum.into(%{})
+    cards = column_ids
+    |> Enum.zip(column_ids |> Enum.map(&FluffySpork.Github.list_cards(FluffySpork.Github, &1)))
+    |> Enum.into(%{})
     %{columns: columns, cards: cards}
   end
 

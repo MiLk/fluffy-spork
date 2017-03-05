@@ -1,4 +1,8 @@
 defmodule FluffySpork do
+  @moduledoc """
+  Start the application
+  """
+
   use Application
   require Logger
 
@@ -13,7 +17,8 @@ defmodule FluffySpork do
       Plug.Adapters.Cowboy.child_spec(:http, FluffySpork.Api, [])
     ]
 
-    projects_children = Application.get_env(:fluffy_spork, :projects)
+    projects_children = :fluffy_spork
+      |> Application.get_env(:projects)
       |> Enum.map(fn(config) ->
         worker(FluffySpork.Github.Project, [config],
           id: FluffySpork.Github.Project.generate_unique_name(config),

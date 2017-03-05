@@ -33,6 +33,7 @@ defmodule FluffySpork.Mixfile do
       {:cowboy, "~> 1.1.2"},
       {:plug, "~> 1.3"},
       {:poison, "~> 3.0"},
+      {:credo, "~> 0.5", only: [:dev, :test]},
     ]
   end
 end
