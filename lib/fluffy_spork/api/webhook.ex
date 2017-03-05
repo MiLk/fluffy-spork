@@ -26,16 +26,14 @@ defmodule FluffySpork.Api.Webhook do
   defp handle_event(:ping, _) do {200, "pong"} end
 
   defp handle_event(:issues, %{"action" => action, "issue" => issue, "repository" => repository})
-    when action == "opened" or action == "closed" or action == "reopened" do
+    when action == "opened" or action == "closed" or action == "reopened" or action == "labeled" or action == "unlabeled" do
       handle_action(String.to_atom(action), :issue, repository, issue)
   end
-  defp handle_event(:issues, %{"action" => "labeled"}) do {204, ""} end
 
   defp handle_event(:pull_request, %{"action" => action, "pull_request" => pull_request, "repository" => repository})
-    when action == "opened" or action == "closed" or action == "reopened" do
+    when action == "opened" or action == "closed" or action == "reopened" or action == "labeled" or action == "unlabeled" do
       handle_action(String.to_atom(action), :pr, repository, pull_request)
   end
-  defp handle_event(:pull_request, %{"action" => "labeled"}) do {204, ""} end
 
   defp handle_event(:project_card, %{
     "action" => "created",
@@ -57,16 +55,22 @@ defmodule FluffySpork.Api.Webhook do
 
   ## Helpers
 
+  defp get_destination_column([], {_, nil}), do: nil
   defp get_destination_column([], {columns, destination}), do: columns |> Enum.at(destination)
   defp get_destination_column(labels, {columns, default_destination}) do
     label_names = labels |> Enum.map(&Map.fetch!(&1, "name"))
-    destination = columns |> Enum.find(fn (column) ->
+    destination = columns |> Enum.reverse |> Enum.find(fn (column) ->
       Map.has_key?(column, :label) and Enum.member?(label_names, Map.fetch!(column, :label))
     end)
     destination || get_destination_column([], {columns, default_destination})
   end
 
   defp get_destination_config(project_config, action, type, pr \\ nil)
+  defp get_destination_config(project_config, action, _, _)
+    when action == :labeled or action == :unlabeled do
+    %{columns: columns} = project_config
+    {columns, nil}
+  end
   defp get_destination_config(project_config, :reopened, type, _) do
     get_destination_config(project_config, :opened, type)
   end
@@ -101,7 +105,7 @@ defmodule FluffySpork.Api.Webhook do
   end
 
   defp do_handle_action(action, project_server, card, destination, _)
-  when action == :reopened or action == :closed do
+  when action == :reopened or action == :closed or action == :labeled or action == :unlabeled do
     card_id = FluffySpork.Github.Project.get_card_id(project_server, card)
     if card_id == nil do
       {repo_owner, repo_name, number} = card
