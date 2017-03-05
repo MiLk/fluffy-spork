@@ -26,13 +26,21 @@ defmodule FluffySpork.Api.Webhook do
   defp handle_event(:ping, _) do {200, "pong"} end
 
   defp handle_event(:issues, %{"action" => action, "issue" => issue, "repository" => repository})
-    when action == "opened" or action == "closed" or action == "reopened" or action == "labeled" or action == "unlabeled" do
+    when action == "opened" or action == "closed" or action == "reopened" or action == "unlabeled" do
       handle_action(String.to_atom(action), :issue, repository, issue)
+  end
+  defp handle_event(:issues, %{"action" => action, "issue" => issue, "repository" => repository, "label" => label})
+    when action == "labeled" do
+      handle_action({String.to_atom(action), label}, :issue, repository, issue)
   end
 
   defp handle_event(:pull_request, %{"action" => action, "pull_request" => pull_request, "repository" => repository})
-    when action == "opened" or action == "closed" or action == "reopened" or action == "labeled" or action == "unlabeled" do
+    when action == "opened" or action == "closed" or action == "reopened" or action == "unlabeled" do
       handle_action(String.to_atom(action), :pr, repository, pull_request)
+  end
+  defp handle_event(:pull_request, %{"action" => action, "pull_request" => pull_request, "repository" => repository, "label" => label})
+    when action == "labeled" do
+      handle_action({String.to_atom(action), label}, :pr, repository, pull_request)
   end
 
   defp handle_event(:project_card, %{
@@ -82,19 +90,33 @@ defmodule FluffySpork.Api.Webhook do
     {columns, default_destination}
   end
 
+  defp handle_action({:labeled, label}, _type, repository, issue) do
+    %{"owner" => %{"login" => repo_owner}, "name" => repo_name} = repository
+    %{"id" => _issue_id, "number" => number} = issue
+
+    project_config = FluffySpork.Config.get_project_for_repo(%{owner: repo_owner, name: repo_name})
+    %{columns: columns} = project_config
+    case get_destination_column([label], {columns, nil}) do
+      nil -> {204, ""}
+      %{name: destination} -> do_handle_action(:labeled, FluffySpork.Github.Project.generate_unique_name(project_config),
+        {repo_owner, repo_name, number}, destination, nil)
+    end
+  end
+
   defp handle_action(action, type, repository, issue) do
     %{"owner" => %{"login" => repo_owner}, "name" => repo_name} = repository
     %{"id" => issue_id, "number" => number} = issue
 
     project_config = FluffySpork.Config.get_project_for_repo(%{owner: repo_owner, name: repo_name})
-    %{name: destination} = get_destination_column(
+    case get_destination_column(
       Map.get(issue, "labels", []),
       get_destination_config(project_config, action, type, issue)
-    )
-
-    do_handle_action(action, FluffySpork.Github.Project.generate_unique_name(project_config),
-      {repo_owner, repo_name, number}, destination,
-      {issue_id, type})
+    ) do
+      nil -> {204, ""}
+      %{name: destination} -> do_handle_action(action, FluffySpork.Github.Project.generate_unique_name(project_config),
+        {repo_owner, repo_name, number}, destination,
+        {issue_id, type})
+    end
   end
 
   defp do_handle_action(:opened, project_server, card, destination, {issue_id, type}) do
